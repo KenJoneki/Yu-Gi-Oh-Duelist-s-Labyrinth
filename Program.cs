@@ -8,6 +8,11 @@ class Program
     public static List<Jugador> jugadores = new List<Jugador>();
     public static Random random = new Random();
     public static char[,] mapa;
+    public static int mapaAncho = 20;
+    public static int mapaAlto = 20;
+    public static (int, int) posicionMeta;
+    public static List<(int, int)> posicionesCartasMagicas = new List<(int, int)>();
+    static int cantidadCartasMagicas = 4;
 
     static void Main()
     {
@@ -15,21 +20,51 @@ class Program
         {
             Historia();
             Instrucciones();
-            List<Cartas> cartas = InicializarCartas();
+            List<Cartas> cartas = EstablecerCartas();
             const int cantidadJugadores = 2;
             int conteoCartas = CantidadDeCartas();
 
             for (int i = 0; i < cantidadJugadores; i++)
             {
                 string nombreJugador;
+                bool nombreValido;
                 do
                 {
                     Console.Write($"Ingrese el nombre del Jugador {i + 1}: ");
                     nombreJugador = Console.ReadLine()!;
-                }
-                while (string.IsNullOrEmpty(nombreJugador) || jugadores.Any(j => j.Nombre == nombreJugador));
+                    nombreValido = !string.IsNullOrEmpty(nombreJugador); // Verificar si el nombre no está vacío
 
-                var cartasDisponibles = cartas.Except(jugadores.SelectMany(j => j.Cartas)).ToList();
+                    if (nombreValido)
+                    {
+                        // Verificar si el nombre ya existe en la lista de jugadores
+                        foreach (var jugadorExistente in jugadores)
+                        {
+                            if (jugadorExistente.Nombre == nombreJugador)
+                            {
+                                Console.WriteLine("Este nombre ya está en uso. Por favor, ingrese un nombre diferente.");
+                                nombreValido = false; // Nombre no válido si ya existe
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("El nombre no puede estar vacío. Por favor, ingrese un nombre.");
+                    }
+                }
+                while (!nombreValido); // Continuar pidiendo el nombre hasta que sea válido y no esté duplicado
+
+                List<Cartas> ObtenerTodasLasCartas()
+                {
+                    List<Cartas> todasLasCartas = new List<Cartas>();
+                    foreach (var jugador in jugadores)
+                    {
+                        todasLasCartas.AddRange(jugador.Cartas);
+                    }
+                    return todasLasCartas;
+                }
+
+                var cartasDisponibles = cartas.Except(ObtenerTodasLasCartas()).ToList();
                 var cartasJugador = SeleccionarCartas(cartasDisponibles, conteoCartas);
                 jugadores.Add(new Jugador(nombreJugador, cartasJugador));
 
@@ -39,7 +74,7 @@ class Program
                 }
             }
 
-            mapa = GenerarMapa(20, 20);
+            mapa = GenerarMapa(mapaAncho, mapaAlto);
             ActualizarEnfriamientos();
             Jugar(mapa);
         }
@@ -90,6 +125,100 @@ class Program
 
         Console.WriteLine();
     }
+    static char[,] GenerarMapa(int ancho, int alto)
+    {
+        char[,] mapa = new char[ancho, alto];
+
+        for (int i = 0; i < ancho; i++)
+        {
+            for (int j = 0; j < alto; j++)
+            {
+                mapa[i, j] = '_';
+            }
+        }
+
+        int metaX = random.Next(ancho);
+        int metaY = random.Next(alto);
+        mapa[metaX, metaY] = 'C';
+        posicionMeta = (metaX, metaY);
+
+        int cantidadTrampas = 5;
+        for (int i = 0; i < cantidadTrampas; i++)
+        {
+            int trampaX = random.Next(ancho);
+            int trampaY = random.Next(alto);
+
+            if (trampaX != metaX || trampaY != metaY)
+            {
+                mapa[trampaX, trampaY] = 'T';
+            }
+        }
+        // Generar las posiciones de las cartas mágicas aleatoriamente
+        posicionesCartasMagicas.Clear();
+        for (int i = 0; i < cantidadCartasMagicas; i++)
+        {
+            int cartaMagicaX = random.Next(ancho);
+            int cartaMagicaY = random.Next(alto);
+
+            // Asegurarse de no colocar una carta mágica sobre la meta o una trampa
+            if ((cartaMagicaX != metaX || cartaMagicaY != metaY) && mapa[cartaMagicaX, cartaMagicaY] != 'T')
+            {
+                posicionesCartasMagicas.Add((cartaMagicaX, cartaMagicaY));
+                // Asegúrate de no sobreescribir una trampa o la meta
+            }
+            else
+            {
+                i--; // Intenta generar otra posición si esta no es válida
+            }
+        }
+
+        return mapa;
+    }
+
+    static void MostrarMapa(char[,] mapa)
+    {
+        Console.WriteLine("Mapa del juego:");
+        for (int i = 0; i < mapa.GetLength(0); i++)
+        {
+            for (int j = 0; j < mapa.GetLength(1); j++)
+            {
+                char celda = mapa[i, j];
+
+                // Priorizar la meta
+                if (i == posicionMeta.Item1 && j == posicionMeta.Item2)
+                {
+                    celda = 'C';
+                }
+                // Priorizar las trampas
+                else if (mapa[i, j] == 'T')
+                {
+                    celda = 'T';
+                }
+                // Priorizar las cartas mágicas
+                else if (posicionesCartasMagicas.Contains((i, j)))
+                {
+                    celda = 'M';
+                }
+                // Mostrar las cartas de los jugadores si no hay nada más importante
+                else
+                {
+                    foreach (var jugador in jugadores)
+                    {
+                        foreach (var carta in jugador.Cartas)
+                        {
+                            if (carta.X == i && carta.Y == j)
+                            {
+                                celda = (jugadores.IndexOf(jugador) == 0) ? 'P' : 'S';
+                                break;
+                            }
+                        }
+                    }
+                }
+                Console.Write(celda + " ");
+            }
+            Console.WriteLine();
+        }
+    }
 
     static void Jugar(char[,] mapa)
     {
@@ -111,15 +240,26 @@ class Program
 
                     SeleccionarTurnoJugador(jugador.Cartas, mapa);
 
-                    // Verificar si alguna carta ha llegado a la meta
-                    if (jugador.Cartas.Any(carta => mapa[carta.X, carta.Y] == 'C'))
+                    bool llegoALaMeta = false;
+                    foreach (var carta in jugador.Cartas)
+                    {
+                        if (carta.X == posicionMeta.Item1 && carta.Y == posicionMeta.Item2)
+                        {
+                            llegoALaMeta = true;
+                            break;
+                        }
+                    }
+
+                    if (llegoALaMeta)
                     {
                         Console.WriteLine($"¡{jugador.Nombre} ha llegado a la meta y ha ganado!");
-                        return; // Terminar juego
+                        return;
                     }
+                    MostrarMapa(mapa);
+
                 }
                 ActualizarEnfriamientos();
-                Thread.Sleep(3000);
+                Thread.Sleep(1000);
             }
         }
         catch (Exception ex)
@@ -158,47 +298,6 @@ class Program
         return cantidadCartas;
     }
 
-    static char[,] GenerarMapa(int filas, int columnas)
-    {
-        char[,] mapa = new char[filas, columnas];
-
-        for (int i = 0; i < filas; i++)
-        {
-            for (int j = 0; j < columnas; j++)
-            {
-                mapa[i, j] = '_';
-            }
-        }
-
-        int metaFila = random.Next(filas);
-        int metaColumna = random.Next(columnas);
-
-        mapa[metaFila, metaColumna] = 'C';
-
-        ColocarElementos(mapa, 'T', 5); // Trampas
-        ColocarElementos(mapa, 'D', 20); // Duelistas
-        ColocarElementos(mapa, 'M', 4); // Cartas mágicas
-
-        return mapa;
-    }
-
-    static void ColocarElementos(char[,] mapa, char elemento, int cantidad)
-    {
-        int colocados = 0;
-
-        while (colocados < cantidad)
-        {
-            int x = random.Next(mapa.GetLength(0));
-            int y = random.Next(mapa.GetLength(1));
-
-            if (mapa[x, y] == '_')
-            {
-                mapa[x, y] = elemento;
-                colocados++;
-            }
-        }
-    }
-
     static void ActualizarEnfriamientos()
     {
         foreach (var jugador in jugadores)
@@ -230,8 +329,17 @@ class Program
         }
     }
 
-    static bool CartasAturdidas(List<Cartas> cartas) =>
-       cartas.All(carta => !carta.SePuedeMover);
+    static bool CartasAturdidas(List<Cartas> cartas)
+    {
+        foreach (var carta in cartas)
+        {
+            if (carta.SePuedeMover)
+            {
+                return false; // Si al menos una carta puede moverse, retorna falso
+            }
+        }
+        return true; // Si ninguna carta puede moverse, retorna verdadero
+    }
 
     static void SeleccionarTurnoJugador(List<Cartas> cartas, char[,] mapa)
     {
@@ -277,7 +385,6 @@ class Program
             ManejarExcepcion(ex);
         }
     }
-
     private static void ActivarHabilidad(Cartas cartaSeleccionada)
     {
         Console.WriteLine($"¿{cartaSeleccionada.Monstruo.Nombre} quiere usar su habilidad especial? (1 para Sí/ 2 para No)");
@@ -292,7 +399,7 @@ class Program
             {
                 if (usoHabilidad == 1)
                 {
-                    List<Cartas> cartasEnemigas = ObtenerCartasEnemigas(jugadores.SelectMany(j => j.Cartas).ToList(), cartaSeleccionada);
+                    List<Cartas> cartasEnemigas = ObtenerCartasEnemigas(ObtenerTodasLasCartas(), cartaSeleccionada);
                     cartaSeleccionada.ActivarHabilidad(cartasEnemigas);
                     break;
                 }
@@ -312,6 +419,17 @@ class Program
             }
         }
     }
+
+    static List<Cartas> ObtenerTodasLasCartas()
+    {
+        List<Cartas> todasLasCartas = new List<Cartas>();
+        foreach (var jugador in jugadores)
+        {
+            todasLasCartas.AddRange(jugador.Cartas);
+        }
+        return todasLasCartas;
+    }
+
 
     static void MostrarCartasConDetalles(List<Cartas> cartas)
     {
@@ -357,136 +475,71 @@ class Program
     static void MoverCarta(Cartas carta, char[,] mapa)
     {
         int movimientosRestantes = carta.Monstruo.Velocidad;
-
         while (movimientosRestantes > 0)
         {
-            try
+            Console.WriteLine($"Movimientos restantes: {movimientosRestantes}");
+            Console.WriteLine("Ingrese la dirección (arriba (w), abajo (s), izquierda (a), derecha (d), cancelar (c)):");
+            string direccion = Console.ReadLine()!.ToLower();
+
+            int nuevaX = carta.X;
+            int nuevaY = carta.Y;
+
+            switch (direccion)
             {
-                Console.WriteLine("Elija una dirección para moverse: (Usa las flechas del teclado)");
-
-                var teclaMovimiento = Console.ReadKey().Key;
-
-                Console.WriteLine();
-
-                int nuevaX = carta.X;
-                int nuevaY = carta.Y;
-
-                if (teclaMovimiento == ConsoleKey.UpArrow) nuevaY -= 1;
-                else if (teclaMovimiento == ConsoleKey.DownArrow) nuevaY += 1;
-                else if (teclaMovimiento == ConsoleKey.LeftArrow) nuevaX -= 1;
-                else if (teclaMovimiento == ConsoleKey.RightArrow) nuevaX += 1;
-                else
-                {
+                case "w":
+                    nuevaX--;
+                    break;
+                case "s":
+                    nuevaX++;
+                    break;
+                case "a":
+                    nuevaY--;
+                    break;
+                case "d":
+                    nuevaY++;
+                    break;
+                case "c":
+                    Console.WriteLine("Movimiento cancelado.");
+                    return;
+                default:
                     Console.WriteLine("Dirección no válida. Intente nuevamente.");
                     continue;
-                }
+            }
 
-                nuevaX = Math.Max(0, Math.Min(nuevaX, mapa.GetLength(0) - 1));
-                nuevaY = Math.Max(0, Math.Min(nuevaY, mapa.GetLength(1) - 1));
-
-                if (EsMovimientoValido(mapa, nuevaX, nuevaY))
+            if (nuevaX >= 0 && nuevaX < mapaAncho && nuevaY >= 0 && nuevaY < mapaAlto)
+            {
+                if (mapa[nuevaX, nuevaY] == 'T' && !carta.SeIgnoraTrampaEsteTurno)
                 {
-                    char celdaDestino = mapa[carta.X, carta.Y];
-                    mapa[carta.X, carta.Y] = '_';
-                    carta.Mover(nuevaX, nuevaY);
-                    mapa[carta.X, carta.Y] = jugadores.IndexOf(jugadores.First(j => j.Cartas.Contains(carta))) == 0 ? 'P' : 'S';
-                    if (celdaDestino == 'T')
-                    {
-                        if (!carta.SeIgnoraTrampaEsteTurno)
-                        {
-                            ActivarTrampa(carta);
-                        }
-                        else
-                        {
-                            Console.WriteLine($"{carta.Monstruo.Nombre} ignora la trampa gracias a Rugido Archidemonio.");
-                        }
-                        return;
-                    }
-                    mapa[carta.X, carta.Y] =
-                        jugadores.IndexOf(jugadores.First(j => j.Cartas.Contains(carta))) == 0 ? 'P' : 'S';
-                    MostrarMapa(mapa);
-
-                    if (celdaDestino == 'M')
-                    {
-                        carta.CartasMagicas(carta);
-                        Console.WriteLine($"{carta.Monstruo.Nombre} ha recogido una carta mágica.");
-                        mapa[carta.X, carta.Y] = '_';
-                    }
-                    if (celdaDestino == 'C')
-                    {
-                        // Verificar si esta es la posición ganadora.
-                        return; // Terminar juego aquí si se llega a 'C'
-                    }
-                    MostrarMapa(mapa);
+                    Console.WriteLine($"{carta.Monstruo.Nombre} ha caído en una trampa.");
+                    ActivarTrampa(carta);
+                    return;
                 }
                 else
                 {
-                    if (mapa[nuevaX, nuevaY] == 'D')
+                    if (carta.SeIgnoraTrampaEsteTurno)
                     {
-                        Console.WriteLine("No puedes moverte a esa posición porque hay un duelistas en el camino.");
+                        Console.WriteLine($"{carta.Monstruo.Nombre} ha evitado una trampa gracias a su habilidad.");
+                        carta.SeIgnoraTrampaEsteTurno = false;
                     }
-                    else if (mapa[nuevaX, nuevaY] == 'P' || mapa[nuevaX, nuevaY] == 'S')
+
+                    carta.Mover(nuevaX, nuevaY);
+                    movimientosRestantes--;
+                    Console.WriteLine($"{carta.Monstruo.Nombre} se ha movido a la posición ({carta.X}, {carta.Y}).");
+
+                    if (posicionesCartasMagicas.Contains((nuevaX, nuevaY)))
                     {
-                        Console.WriteLine("No puedes moverte a esa posición porque ya hay una carta allí.");
-                    }
-                    else
-                    {
-                        Console.WriteLine("No puedes moverte a esa posición.");
-                    }
-                    break;
-                }
-
-                movimientosRestantes--;
-            }
-            catch (Exception ex)
-            {
-                ManejarExcepcion(ex);
-            }
-        }
-        carta.SeIgnoraTrampaEsteTurno = false;
-    }
-
-    static bool EsMovimientoValido(char[,] mapa, int x, int y)
-    {
-        return x >= 0 && x < mapa.GetLength(0) && y >= 0 && y < mapa.GetLength(1) && mapa[x, y] != 'D' && mapa[x, y] != 'P' && mapa[x, y] != 'S';
-    }
-
-    static void MostrarMapa(char[,] mapa)
-    {
-        int filas = mapa.GetLength(0);
-        int columnas = mapa.GetLength(1);
-
-        Console.WriteLine(new string('═', columnas * 2 + 1));
-
-        for (int i = 0; i < filas; i++)
-        {
-            try
-            {
-                Console.Write("║");
-
-                for (int j = 0; j < columnas; j++)
-                {
-                    var cartaEnPosicion = jugadores.SelectMany(j => j.Cartas).FirstOrDefault(c => c.X == j && c.Y == i);
-
-                    if (cartaEnPosicion != null)
-                    {
-                        string simboloCarta = jugadores.IndexOf(jugadores.First(j => j.Cartas.Contains(cartaEnPosicion))) == 0 ? "P" : "S";
-                        Console.Write($"{simboloCarta} ");
-                    }
-                    else
-                    {
-                        Console.Write(mapa[i, j] + " ");
+                        Console.WriteLine($"{carta.Monstruo.Nombre} ha encontrado una carta mágica.");
+                        carta.CartasMagicas(carta);
+                        posicionesCartasMagicas.Remove((nuevaX, nuevaY));
+                        mapa[nuevaX, nuevaY] = '_'; // Eliminar la carta mágica del mapa después de usarla
                     }
                 }
-                Console.WriteLine("║");
             }
-            catch (Exception ex)
+            else
             {
-                ManejarExcepcion(ex);
+                Console.WriteLine("No puedes salirte del mapa. Intenta otra dirección.");
             }
         }
-
-        Console.WriteLine(new string('═', columnas * 2 + 1));
     }
 
     static void ActivarTrampa(Cartas carta)
@@ -522,8 +575,7 @@ class Program
             carta.RegresarAPosicionAnterior();
         }
     }
-
-    static List<Cartas> InicializarCartas()
+    static List<Cartas> EstablecerCartas()
     {
         var personajes = new List<Monstruo>
        {
@@ -538,38 +590,36 @@ class Program
            new Monstruo { Nombre = "Dragón Sincro de Ala Transparente", Habilidad = "Disminuye la velocidad a una carta.", Velocidad = 3, TiempoEnfriamiento = 4 }
        };
 
-        return personajes.Select(monstruo => new Cartas(monstruo)).ToList();
+        List<Cartas> cartas = new List<Cartas>();
+        foreach (var monstruo in personajes)
+        {
+            Cartas nuevaCarta = new Cartas(monstruo);
+            cartas.Add(nuevaCarta);
+        }
+        return cartas;
     }
 
-    static List<Cartas> SeleccionarCartas(List<Cartas> cartasParaSeleccionar, int cantidad)
+    static List<Cartas> SeleccionarCartas(List<Cartas> cartasDisponibles, int cantidad)
     {
-        var cartasSeleccionadas = new List<Cartas>();
+        List<Cartas> cartasSeleccionadas = new List<Cartas>();
+        Random random = new Random();
 
-        while (cartasSeleccionadas.Count < cantidad && cartasParaSeleccionar.Count > 0)
+        for (int i = 0; i < cantidad; i++)
         {
-            MostrarOpciones(cartasParaSeleccionar);
-            int indiceEleccion;
-
-            while (true)
+            if (cartasDisponibles.Count == 0)
             {
-                Console.WriteLine("Ingrese el número de la carta que desea escoger: ");
-                if (int.TryParse(Console.ReadLine(), out indiceEleccion) && indiceEleccion >= 1 && indiceEleccion <= cartasParaSeleccionar.Count)
-                {
-                    break;
-                }
-                else
-                {
-                    Console.WriteLine("Selección no válida. Inténtalo de nuevo.");
-                }
+                Console.WriteLine("No hay suficientes cartas disponibles.");
+                break;
             }
 
-            cartasSeleccionadas.Add(cartasParaSeleccionar[indiceEleccion - 1]);
-            cartasParaSeleccionar.RemoveAt(indiceEleccion - 1);
+            int indiceCarta = random.Next(cartasDisponibles.Count);
+            Cartas cartaSeleccionada = cartasDisponibles[indiceCarta];
+            cartasSeleccionadas.Add(cartaSeleccionada);
+            cartasDisponibles.RemoveAt(indiceCarta);
         }
 
         return cartasSeleccionadas;
     }
-
     static void MostrarOpciones(List<Cartas> cartas)
     {
         Console.WriteLine("Opciones disponibles:");
@@ -603,8 +653,8 @@ class Cartas
     public Cartas(Monstruo monstruo)
     {
         Monstruo = monstruo;
-        XDeInicio = random.Next(20);
-        YDeInicio = random.Next(20);
+        XDeInicio = random.Next(Program.mapaAncho);
+        YDeInicio = random.Next(Program.mapaAlto);
         X = XDeInicio;
         Y = YDeInicio;
         SePuedeMover = true;
@@ -662,17 +712,14 @@ class Cartas
             QuitarBuffsEnemigo(cartasEnemigas);
         }
 
-        // Si es Dragón Polvo de Estrellas, disminuir velocidad de todas las cartas enemigas
         else if (Monstruo.Nombre == "Dragón Polvo de Estrellas")
         {
             foreach (var enemigo in cartasEnemigas)
             {
-                enemigo.DisminuirVelocidad(1); // Disminuir la velocidad en 1
+                enemigo.DisminuirVelocidad(1);
                 Console.WriteLine($"{Monstruo.Nombre} ha disminuido la velocidad de {enemigo.Monstruo.Nombre} en 1.");
             }
         }
-
-
         else if (Monstruo.Nombre == "Dragón Péndulo de Ojos Anómalos")
         {
             StunEnemigo(cartasEnemigas);
@@ -731,7 +778,7 @@ class Cartas
     public void CartasMagicas(Cartas carta)
     {
         Random randomGen = new Random();
-        int tipoCartaMagica = randomGen.Next(1, 5); // Cambiar a un rango que incluya Teletransporte
+        int tipoCartaMagica = randomGen.Next(1, 5);
 
         if (tipoCartaMagica == 1)
         {
@@ -755,7 +802,7 @@ class Cartas
         }
         else if (tipoCartaMagica == 4)
         {
-            ActivarAgujeroNegro(); // Implementa lógica para Agujero Negro.
+            ActivarAgujeroNegro();
         }
         else
         {
@@ -767,16 +814,15 @@ class Cartas
     {
         Console.WriteLine($"{Monstruo.Nombre} HA ACTIVADO TELETRANSPORTE. Teletransportando a una nueva posición aleatoria...");
 
-        // Intentar encontrar una posición vacía aleatoria
         int nuevaX, nuevaY;
         bool posicionEncontrada = false;
 
-        for (int i = 0; i < 100; i++) // Intentamos hasta 100 veces para encontrar una posición vacía
+        for (int i = 0; i < 100; i++)
         {
-            nuevaX = random.Next(20); // Genera una coordenada X aleatoria
-            nuevaY = random.Next(20); // Genera una coordenada Y aleatoria
+            nuevaX = random.Next(Program.mapaAncho);
+            nuevaY = random.Next(Program.mapaAlto);
 
-            if (Program.mapa[nuevaX, nuevaY] == '_') // Verifica si la posición está vacía
+            if (Program.mapa[nuevaX, nuevaY] == '_')
             {
                 Mover(nuevaX, nuevaY);
                 posicionEncontrada = true;
@@ -797,7 +843,7 @@ class Cartas
     {
         Console.WriteLine($"{Monstruo.Nombre} HA ACTIVADO AGUJERO NEGRO. TODAS LAS CARTAS REGRESARÁN A SUS POSICIONES INICIALES.");
 
-        foreach (var jugadorCartas in Program.jugadores) // Accede a las cartasJugadores del contexto global.
+        foreach (var jugadorCartas in Program.jugadores)
         {
             foreach (var carta in jugadorCartas.Cartas)
             {
@@ -828,4 +874,19 @@ class Monstruo
     public int TiempoEnfriamiento { get; set; }
     public string Habilidad { get; set; }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
