@@ -32,17 +32,16 @@ class Program
                 {
                     Console.Write($"Ingrese el nombre del Jugador {i + 1}: ");
                     nombreJugador = Console.ReadLine()!;
-                    nombreValido = !string.IsNullOrEmpty(nombreJugador); // Verificar si el nombre no está vacío
+                    nombreValido = !string.IsNullOrEmpty(nombreJugador);
 
                     if (nombreValido)
                     {
-                        // Verificar si el nombre ya existe en la lista de jugadores
                         foreach (var jugadorExistente in jugadores)
                         {
                             if (jugadorExistente.Nombre == nombreJugador)
                             {
                                 Console.WriteLine("Este nombre ya está en uso. Por favor, ingrese un nombre diferente.");
-                                nombreValido = false; // Nombre no válido si ya existe
+                                nombreValido = false;
                                 break;
                             }
                         }
@@ -52,7 +51,7 @@ class Program
                         Console.WriteLine("El nombre no puede estar vacío. Por favor, ingrese un nombre.");
                     }
                 }
-                while (!nombreValido); // Continuar pidiendo el nombre hasta que sea válido y no esté duplicado
+                while (!nombreValido);
 
                 List<Cartas> ObtenerTodasLasCartas()
                 {
@@ -153,22 +152,21 @@ class Program
                 mapa[trampaX, trampaY] = 'T';
             }
         }
-        // Generar las posiciones de las cartas mágicas aleatoriamente
+
         posicionesCartasMagicas.Clear();
         for (int i = 0; i < cantidadCartasMagicas; i++)
         {
             int cartaMagicaX = random.Next(ancho);
             int cartaMagicaY = random.Next(alto);
 
-            // Asegurarse de no colocar una carta mágica sobre la meta o una trampa
+
             if ((cartaMagicaX != metaX || cartaMagicaY != metaY) && mapa[cartaMagicaX, cartaMagicaY] != 'T')
             {
                 posicionesCartasMagicas.Add((cartaMagicaX, cartaMagicaY));
-                // Asegúrate de no sobreescribir una trampa o la meta
             }
             else
             {
-                i--; // Intenta generar otra posición si esta no es válida
+                i--;
             }
         }
 
@@ -184,22 +182,22 @@ class Program
             {
                 char celda = mapa[i, j];
 
-                // Priorizar la meta
+
                 if (i == posicionMeta.Item1 && j == posicionMeta.Item2)
                 {
                     celda = 'C';
                 }
-                // Priorizar las trampas
+
                 else if (mapa[i, j] == 'T')
                 {
                     celda = 'T';
                 }
-                // Priorizar las cartas mágicas
+
                 else if (posicionesCartasMagicas.Contains((i, j)))
                 {
                     celda = 'M';
                 }
-                // Mostrar las cartas de los jugadores si no hay nada más importante
+
                 else
                 {
                     foreach (var jugador in jugadores)
@@ -335,10 +333,10 @@ class Program
         {
             if (carta.SePuedeMover)
             {
-                return false; // Si al menos una carta puede moverse, retorna falso
+                return false;
             }
         }
-        return true; // Si ninguna carta puede moverse, retorna verdadero
+        return true;
     }
 
     static void SeleccionarTurnoJugador(List<Cartas> cartas, char[,] mapa)
@@ -531,7 +529,7 @@ class Program
                         Console.WriteLine($"{carta.Monstruo.Nombre} ha encontrado una carta mágica.");
                         carta.CartasMagicas(carta);
                         posicionesCartasMagicas.Remove((nuevaX, nuevaY));
-                        mapa[nuevaX, nuevaY] = '_'; // Eliminar la carta mágica del mapa después de usarla
+                        mapa[nuevaX, nuevaY] = '_';
                     }
                 }
             }
