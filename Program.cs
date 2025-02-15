@@ -13,6 +13,8 @@ class Program
     public static (int, int) posicionMeta;
     public static List<(int, int)> posicionesCartasMagicas = new List<(int, int)>();
     static int cantidadCartasMagicas = 4;
+    static List<(int, int)> posicionesObstaculos = new List<(int, int)>();
+    static int cantidadObstaculos = 25;
 
     static void Main()
     {
@@ -36,6 +38,7 @@ class Program
 
                     if (nombreValido)
                     {
+
                         foreach (var jugadorExistente in jugadores)
                         {
                             if (jugadorExistente.Nombre == nombreJugador)
@@ -64,7 +67,7 @@ class Program
                 }
 
                 var cartasDisponibles = cartas.Except(ObtenerTodasLasCartas()).ToList();
-                var cartasJugador = SeleccionarCartas(cartasDisponibles, conteoCartas);
+                var cartasJugador = SeleccionarCartas(cartasDisponibles.ToList(), conteoCartas);
                 jugadores.Add(new Jugador(nombreJugador, cartasJugador));
 
                 if (i == 0)
@@ -159,10 +162,35 @@ class Program
             int cartaMagicaX = random.Next(ancho);
             int cartaMagicaY = random.Next(alto);
 
-
             if ((cartaMagicaX != metaX || cartaMagicaY != metaY) && mapa[cartaMagicaX, cartaMagicaY] != 'T')
             {
                 posicionesCartasMagicas.Add((cartaMagicaX, cartaMagicaY));
+
+            }
+            else
+            {
+                i--;
+            }
+        }
+
+
+        posicionesObstaculos.Clear();
+        for (int i = 0; i < cantidadObstaculos; i++)
+        {
+            int obstaculoX = random.Next(ancho);
+            int obstaculoY = random.Next(alto);
+
+
+            if ((obstaculoX != metaX || obstaculoY != metaY) && mapa[obstaculoX, obstaculoY] != 'T' && !posicionesCartasMagicas.Contains((obstaculoX, obstaculoY)))
+            {
+                if (!posicionesObstaculos.Contains((obstaculoX, obstaculoY)))
+                {
+                    posicionesObstaculos.Add((obstaculoX, obstaculoY));
+                }
+                else
+                {
+                    i--;
+                }
             }
             else
             {
@@ -191,6 +219,11 @@ class Program
                 else if (mapa[i, j] == 'T')
                 {
                     celda = 'T';
+                }
+
+                else if (posicionesObstaculos.Contains((i, j)))
+                {
+                    celda = 'D';
                 }
 
                 else if (posicionesCartasMagicas.Contains((i, j)))
@@ -349,8 +382,8 @@ class Program
 
             while (true)
             {
-                string seleccion = Console.ReadLine();
-                if (!int.TryParse(seleccion, out indiceEleccion) || indiceEleccion < 1 || indiceEleccion > cartas.Count)
+                string n = Console.ReadLine();
+                if (!int.TryParse(n, out indiceEleccion) || indiceEleccion < 1 || indiceEleccion > cartas.Count)
                 {
                     Console.WriteLine("Selección no válida. Intente nuevamente.");
                     continue;
@@ -360,7 +393,7 @@ class Program
 
                 if (!cartaSeleccionada.SePuedeMover)
                 {
-                    Console.WriteLine($"{cartaSeleccionada.Monstruo.Nombre} no puede moverse este turno debido a estar aturdido. Por favor, seleccione otra ficha.");
+                    Console.WriteLine($"{cartaSeleccionada.Monstruo.Nombre} no se moverá este turno porque está aturdido, selecciona otra carta.");
                     continue;
                 }
 
@@ -465,10 +498,8 @@ class Program
 
         Console.WriteLine($"Turno de {carta.Monstruo.Nombre}. Posición actual: ({carta.X}, {carta.Y})");
 
-        Interactuar(carta, mapa);
+        MoverCarta(carta, mapa);
     }
-
-    static void Interactuar(Cartas carta, char[,] mapa) => MoverCarta(carta, mapa);
 
     static void MoverCarta(Cartas carta, char[,] mapa)
     {
@@ -506,6 +537,11 @@ class Program
 
             if (nuevaX >= 0 && nuevaX < mapaAncho && nuevaY >= 0 && nuevaY < mapaAlto)
             {
+                if (posicionesObstaculos.Contains((nuevaX, nuevaY)))
+                {
+                    Console.WriteLine($"{carta.Monstruo.Nombre} ha chocado con un duelista, intenta moverte en otra dirección ");
+                    continue;
+                }
                 if (mapa[nuevaX, nuevaY] == 'T' && !carta.SeIgnoraTrampaEsteTurno)
                 {
                     Console.WriteLine($"{carta.Monstruo.Nombre} ha caído en una trampa.");
@@ -597,23 +633,31 @@ class Program
         return cartas;
     }
 
-    static List<Cartas> SeleccionarCartas(List<Cartas> cartasDisponibles, int cantidad)
-    {
-        List<Cartas> cartasSeleccionadas = new List<Cartas>();
-        Random random = new Random();
 
-        for (int i = 0; i < cantidad; i++)
+    static List<Cartas> SeleccionarCartas(List<Cartas> cartasParaSeleccionar, int cantidad)
+    {
+        var cartasSeleccionadas = new List<Cartas>();
+
+        while (cartasSeleccionadas.Count < cantidad && cartasParaSeleccionar.Count > 0)
         {
-            if (cartasDisponibles.Count == 0)
+            MostrarOpciones(cartasParaSeleccionar);
+            int indiceEleccion;
+
+            while (true)
             {
-                Console.WriteLine("No hay suficientes cartas disponibles.");
-                break;
+                Console.WriteLine("Ingrese el número de la carta que desea escoger: ");
+                if (int.TryParse(Console.ReadLine(), out indiceEleccion) && indiceEleccion >= 1 && indiceEleccion <= cartasParaSeleccionar.Count)
+                {
+                    break;
+                }
+                else
+                {
+                    Console.WriteLine("Selección no válida. Inténtalo de nuevo.");
+                }
             }
 
-            int indiceCarta = random.Next(cartasDisponibles.Count);
-            Cartas cartaSeleccionada = cartasDisponibles[indiceCarta];
-            cartasSeleccionadas.Add(cartaSeleccionada);
-            cartasDisponibles.RemoveAt(indiceCarta);
+            cartasSeleccionadas.Add(cartasParaSeleccionar[indiceEleccion - 1]);
+            cartasParaSeleccionar.RemoveAt(indiceEleccion - 1);
         }
 
         return cartasSeleccionadas;
@@ -872,19 +916,3 @@ class Monstruo
     public int TiempoEnfriamiento { get; set; }
     public string Habilidad { get; set; }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
